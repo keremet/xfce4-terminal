@@ -1263,13 +1263,18 @@ fill_user_menu (gchar                **v_lines,
                 {
                   in++;
                   *out = '\n';
+                  continue;
                 }
               else if ('t' == in[1])
                 {
                   in++;
                   *out = '\t';
+                  continue;
                 }
             }
+
+          if (in != out)
+            *out = *in;
         }
         *out = '\0';
 
