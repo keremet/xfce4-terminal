@@ -397,6 +397,7 @@ static const GtkToggleActionEntry toggle_action_entries[] =
 };
 
 static const char* MENU_ITEM_PROP_NAME = "terminal_window_private";
+static const char* MENU_ITEM_TAB_LABEL = "tab_label";
 
 
 
@@ -1177,7 +1178,14 @@ user_menu_item_activate (GtkWidget  *menu_item,
 
   priv = (TerminalWindowPrivate*)g_object_get_data (G_OBJECT (menu_item), MENU_ITEM_PROP_NAME);
   if (priv && priv->active)
+  {
+    const char* tab_lbl;
+
+    tab_lbl = (const char*)g_object_get_data (G_OBJECT (menu_item), MENU_ITEM_TAB_LABEL);
     terminal_screen_feed_text (priv->active, cmd);
+    if (tab_lbl)
+      terminal_screen_set_custom_title (priv->active, tab_lbl);
+  }
 }
 
 
@@ -1185,6 +1193,7 @@ user_menu_item_activate (GtkWidget  *menu_item,
 static GtkWidget*
 add_user_menu_item (GtkMenuShell          *menu,
                     const char            *lbl,
+                    const char            *tab_lbl,
                     const char            *cmd,
                     TerminalWindowPrivate *priv)
 {
@@ -1200,6 +1209,8 @@ add_user_menu_item (GtkMenuShell          *menu,
     }
 
   g_object_set_data (G_OBJECT (menu_item), MENU_ITEM_PROP_NAME, (gpointer)priv);
+  if (tab_lbl && *tab_lbl != '\0')
+    g_object_set_data (G_OBJECT (menu_item), MENU_ITEM_TAB_LABEL, (gpointer)tab_lbl);
   gtk_menu_shell_append (menu, menu_item);
   gtk_widget_show (menu_item);
   return menu_item;
@@ -1251,10 +1262,14 @@ fill_user_menu (gchar                **v_lines,
       }
     else
       {
-        gchar *out, *in;
+        gchar *out, *in, *tab_pos2;
 
         *tab_pos = '\0';
         out = tab_pos + 1;
+		tab_pos2 = strchr (out, '\t');
+		if (tab_pos2 != NULL)
+		  *tab_pos2 = '\0';
+
         for (in = tab_pos + 1; *in; in++, out++)
         {
           if ('\\' == in[0])
@@ -1278,7 +1293,7 @@ fill_user_menu (gchar                **v_lines,
         }
         *out = '\0';
 
-        add_user_menu_item (menu_shell, *line, tab_pos + 1, priv);
+        add_user_menu_item (menu_shell, *line, (tab_pos2 != NULL) ? tab_pos2 + 1 : NULL, tab_pos + 1, priv);
       }
   }
   

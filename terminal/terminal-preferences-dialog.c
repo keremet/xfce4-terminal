@@ -132,6 +132,7 @@ enum
   COMMAND_COLUMN_LABEL,
   COMMAND_COLUMN_COMMAND,
   COMMAND_COLUMN_SENSITIVE,
+  COMMAND_COLUMN_TAB_LABEL,
   N_COMMAND_COLUMNS
 };
 
@@ -207,7 +208,18 @@ fill_commands_model (gchar **v_lines,
         }
       else
         {
+          gchar *tab_pos2;
+
           *tab_pos = '\0';
+          tab_pos2 = strchr (tab_pos + 1, '\t');
+          if (tab_pos2 != NULL)
+            {
+              *tab_pos2 = '\0';
+              gtk_tree_store_set (model, &iter,
+                  COMMAND_COLUMN_TAB_LABEL, tab_pos2 + 1,
+                  -1);
+            }
+          
           gtk_tree_store_set (model, &iter,
               COMMAND_COLUMN_LABEL,    *line,
               COMMAND_COLUMN_COMMAND,   tab_pos + 1,
@@ -571,7 +583,7 @@ terminal_preferences_dialog_init (TerminalPreferencesDialog *dialog)
 
   object = gtk_builder_get_object (GTK_BUILDER (dialog), "commands");
   terminal_return_if_fail (G_IS_OBJECT (object));
-  model = GTK_TREE_MODEL (gtk_tree_store_new (N_COMMAND_COLUMNS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN));
+  model = GTK_TREE_MODEL (gtk_tree_store_new (N_COMMAND_COLUMNS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN, G_TYPE_STRING));
   g_object_get (dialog->preferences, "commands", &commands, NULL);
   if (commands)
     {
@@ -604,6 +616,11 @@ terminal_preferences_dialog_init (TerminalPreferencesDialog *dialog)
       G_CALLBACK (terminal_preferences_dialog_up_down_command), dialog);
 
   object = gtk_builder_get_object (GTK_BUILDER (dialog), "crt-label");
+  terminal_return_if_fail (G_IS_OBJECT (object));
+  g_signal_connect (object, "edited",
+      G_CALLBACK (terminal_preferences_dialog_command_edited), dialog);
+
+  object = gtk_builder_get_object (GTK_BUILDER (dialog), "crt-tab-label");
   terminal_return_if_fail (G_IS_OBJECT (object));
   g_signal_connect (object, "edited",
       G_CALLBACK (terminal_preferences_dialog_command_edited), dialog);
@@ -1346,18 +1363,21 @@ tree_level_to_str(GtkTreeModel *model,
        valid = gtk_tree_model_iter_next (model, &iter))
     {
       char *label;
+      char *tab_label;
       char *command;
 
       gtk_tree_model_get (model, &iter,
-          COMMAND_COLUMN_LABEL,   &label,
-          COMMAND_COLUMN_COMMAND, &command,
+          COMMAND_COLUMN_LABEL,     &label,
+          COMMAND_COLUMN_TAB_LABEL, &tab_label,
+          COMMAND_COLUMN_COMMAND,   &command,
           -1);
 
       if(!gtk_tree_model_iter_has_child (model, &iter))
         {
-          g_string_append_printf (s, "%s\t%s\n",
-              (NULL == label)   ? "" : label,
-              (NULL == command) ? "" : command);
+          g_string_append_printf (s, "%s\t%s\t%s\n",
+              (NULL == label)     ? "" : label,
+              (NULL == command)   ? "" : command,
+              (NULL == tab_label) ? "" : tab_label);
         }
       else
         {
@@ -1371,6 +1391,7 @@ tree_level_to_str(GtkTreeModel *model,
         }
 
       g_free (label);
+      g_free (tab_label);
       g_free (command);
     }
 
@@ -1467,7 +1488,10 @@ terminal_preferences_dialog_command_edited (GtkCellRendererText       *renderer,
       (GTK_CELL_RENDERER_TEXT (gtk_builder_get_object (GTK_BUILDER (dialog),
                                    "crt-label")) == renderer)
         ? COMMAND_COLUMN_LABEL 
-        : COMMAND_COLUMN_COMMAND;
+        : (GTK_CELL_RENDERER_TEXT (gtk_builder_get_object (GTK_BUILDER (dialog),
+                                   "crt-tab-label")) == renderer)
+          ? COMMAND_COLUMN_TAB_LABEL
+          : COMMAND_COLUMN_COMMAND;
   gtk_tree_store_set (GTK_TREE_STORE (model), &iter, column, new_text, -1);
   terminal_preferences_dialog_save_commands (model, dialog->preferences);
 }
